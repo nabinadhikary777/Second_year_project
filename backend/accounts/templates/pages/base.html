@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}SawariSewa{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; color: #333; margin: 0; background: #f5f5f5; }
+        .site-header { background: #1976d2; color: white; padding: 1rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .site-header a { color: white; text-decoration: none; }
+        .site-header h1 { margin: 0; font-size: 1.5rem; }
+        .nav { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 1rem; }
+        .nav a { opacity: 0.9; }
+        .nav a:hover { opacity: 1; text-decoration: underline; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; background: white; min-height: 60vh; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        .container h2 { color: #1976d2; margin-top: 0; border-bottom: 2px solid #e3f2fd; padding-bottom: 0.5rem; }
+        .footer { text-align: center; padding: 1.5rem; color: #666; font-size: 0.9rem; }
+        .footer a { color: #1976d2; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header class="site-header">
+        <h1><a href="/">SawariSewa</a></h1>
+        <nav class="nav">
+            <a href="{% url 'page_about' %}">About Us</a>
+            <a href="{% url 'page_contact' %}">Contact</a>
+            <a href="{% url 'page_terms' %}">Terms &amp; Conditions</a>
+            <a href="{% url 'page_privacy' %}">Privacy Policy</a>
+        </nav>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">
+        <p>&copy; {% now "Y" %} SawariSewa. All rights reserved. &bull; <a href="{% url 'page_about' %}">About</a> &bull; <a href="{% url 'page_contact' %}">Contact</a> &bull; <a href="{% url 'page_terms' %}">Terms</a> &bull; <a href="{% url 'page_privacy' %}">Privacy</a></p>
+    </footer>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

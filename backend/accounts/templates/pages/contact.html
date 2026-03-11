@@ -1,0 +1,27 @@
+{% extends "pages/base.html" %}
+{% block title %}Contact – SawariSewa{% endblock %}
+{% block content %}
+<h2>Contact Us</h2>
+<p>We’d love to hear from you. Use the details below to get in touch.</p>
+
+<h3>General Enquiries</h3>
+<ul>
+    <li><strong>Email:</strong> <a href="mailto:support@sawarisewa.com">support@sawarisewa.com</a></li>
+    <li><strong>Phone:</strong> +977-1-XXXXXXX (replace with your number)</li>
+</ul>
+
+<h3>Business &amp; Partnerships</h3>
+<p>For partnership or business inquiries, email us at <a href="mailto:business@sawarisewa.com">business@sawarisewa.com</a>.</p>
+
+<h3>Office Address</h3>
+<p>
+    SawariSewa<br>
+    Kathmandu, Nepal<br>
+    (Update with your actual address)
+</p>
+
+<h3>Response Time</h3>
+<p>We aim to respond to all messages within 1–2 business days.</p>
+
+<p>You can also read our <a href="{% url 'page_about' %}">About Us</a> and <a href="{% url 'page_terms' %}">Terms &amp; Conditions</a> for more information.</p>
+{% endblock %}

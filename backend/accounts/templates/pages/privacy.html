@@ -1,0 +1,55 @@
+{% extends "pages/base.html" %}
+{% block title %}Privacy Policy – SawariSewa{% endblock %}
+{% block content %}
+<h2>Privacy Policy</h2>
+<p>SawariSewa (“we”, “our”) is committed to protecting your privacy. This policy explains how we collect, use, and safeguard your information when you use our platform.</p>
+
+<h3>1. Information We Collect</h3>
+<ul>
+    <li><strong>Account information:</strong> Name, email, phone number, address, and profile details you provide when registering.</li>
+    <li><strong>Vehicle and booking data:</strong> Details of vehicles listed, bookings made, and payment-related information.</li>
+    <li><strong>Usage data:</strong> How you use the platform (e.g. pages visited, actions taken) to improve our services.</li>
+</ul>
+
+<h3>2. How We Use Your Information</h3>
+<p>We use your information to:</p>
+<ul>
+    <li>Provide and operate the vehicle rental platform</li>
+    <li>Process bookings and payments</li>
+    <li>Communicate with you about your account, bookings, and updates</li>
+    <li>Improve our services and user experience</li>
+    <li>Comply with legal obligations and enforce our <a href="{% url 'page_terms' %}">Terms &amp; Conditions</a></li>
+</ul>
+
+<h3>3. Sharing of Information</h3>
+<p>We may share your information with:</p>
+<ul>
+    <li><strong>Other users:</strong> As needed to complete bookings (e.g. contact details between owner and customer).</li>
+    <li><strong>Payment providers:</strong> Such as Khalti, to process payments securely.</li>
+    <li><strong>Legal authorities:</strong> When required by law or to protect our rights and safety.</li>
+</ul>
+<p>We do not sell your personal information to third parties.</p>
+
+<h3>4. Data Security</h3>
+<p>We use appropriate technical and organizational measures to protect your data. Passwords are stored in an encrypted form, and we follow industry practices for securing our systems.</p>
+
+<h3>5. Your Rights</h3>
+<p>You may:</p>
+<ul>
+    <li>Access and update your profile and preferences in your account</li>
+    <li>Request a copy of the personal data we hold about you</li>
+    <li>Ask us to correct or delete your data, subject to legal and operational requirements</li>
+</ul>
+<p>To exercise these rights, please <a href="{% url 'page_contact' %}">contact us</a>.</p>
+
+<h3>6. Cookies and Similar Technologies</h3>
+<p>We may use cookies and similar technologies for authentication, preferences, and analytics. You can adjust your browser settings to manage cookies.</p>
+
+<h3>7. Changes to This Policy</h3>
+<p>We may update this Privacy Policy from time to time. We will notify you of significant changes via email or a notice on the platform.</p>
+
+<h3>8. Contact Us</h3>
+<p>For privacy-related questions or requests, please <a href="{% url 'page_contact' %}">contact us</a>.</p>
+
+<p><em>Last updated: {% now "F Y" %}</em></p>
+{% endblock %}

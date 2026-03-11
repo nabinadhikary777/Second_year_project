@@ -1,0 +1,44 @@
+{% extends "pages/base.html" %}
+{% block title %}Terms &amp; Conditions – SawariSewa{% endblock %}
+{% block content %}
+<h2>Terms &amp; Conditions</h2>
+<p>Welcome to SawariSewa. By using our platform, you agree to these Terms and Conditions. Please read them carefully.</p>
+
+<h3>1. Acceptance of Terms</h3>
+<p>By registering, browsing, or using SawariSewa (the “Platform”), you agree to be bound by these Terms and our <a href="{% url 'page_privacy' %}">Privacy Policy</a>. If you do not agree, please do not use the Platform.</p>
+
+<h3>2. Use of the Platform</h3>
+<ul>
+    <li>You must be at least 18 years old and legally able to enter into contracts to use the Platform.</li>
+    <li>You are responsible for keeping your account credentials secure and for all activity under your account.</li>
+    <li>You must provide accurate information when registering and listing or booking vehicles.</li>
+</ul>
+
+<h3>3. For Vehicle Owners</h3>
+<ul>
+    <li>You must have the legal right to list and rent out the vehicle.</li>
+    <li>Vehicles must be in roadworthy condition and comply with local laws.</li>
+    <li>You agree to our commission and payment terms as displayed on the Platform.</li>
+</ul>
+
+<h3>4. For Customers</h3>
+<ul>
+    <li>You must hold a valid driving license where required for the vehicle you rent.</li>
+    <li>You are responsible for the vehicle during the rental period and must return it in the agreed condition.</li>
+    <li>Payment is due as per the booking and our payment policy.</li>
+</ul>
+
+<h3>5. Bookings and Cancellations</h3>
+<p>Cancellation and refund rules are shown at the time of booking. Cancelling may incur fees as stated in those rules.</p>
+
+<h3>6. Limitation of Liability</h3>
+<p>SawariSewa acts as a platform connecting owners and customers. We are not liable for disputes between users, vehicle condition, or incidents during rental beyond what is required by law.</p>
+
+<h3>7. Changes to Terms</h3>
+<p>We may update these Terms from time to time. Continued use of the Platform after changes constitutes acceptance of the updated Terms.</p>
+
+<h3>8. Contact</h3>
+<p>For questions about these Terms, please <a href="{% url 'page_contact' %}">contact us</a>.</p>
+
+<p><em>Last updated: {% now "F Y" %}</em></p>
+{% endblock %}
