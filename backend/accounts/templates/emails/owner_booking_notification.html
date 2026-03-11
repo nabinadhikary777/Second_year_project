@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>New Booking Request</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #1976d2; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-top: none; }
+        .booking-details { background: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .label { font-weight: bold; color: #555; }
+        .value { color: #1976d2; }
+        .button { display: inline-block; padding: 10px 20px; background: #1976d2; color: white; text-decoration: none; border-radius: 5px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>New Booking Request</h2>
+        </div>
+        
+        <div class="content">
+            <h3>Hello {{ owner_name }}!</h3>
+            <p>You have received a new booking request for your vehicle.</p>
+            
+            <div class="booking-details">
+                <div class="detail-row">
+                    <span class="label">Booking ID:</span>
+                    <span class="value">#{{ booking_id }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Customer:</span>
+                    <span class="value">{{ customer_name }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Customer Phone:</span>
+                    <span class="value">{{ customer_phone }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Vehicle:</span>
+                    <span class="value">{{ vehicle }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Pickup Date:</span>
+                    <span class="value">{{ start_date }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Return Date:</span>
+                    <span class="value">{{ end_date }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Total Amount:</span>
+                    <span class="value">रू {{ total_amount|floatformat:2 }}</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{ site_url }}/owner/bookings" class="button">
+                    Review Booking Request
+                </a>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">
+                Please review and respond to this booking request as soon as possible.
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>© {{ year }} SawariSewa. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
