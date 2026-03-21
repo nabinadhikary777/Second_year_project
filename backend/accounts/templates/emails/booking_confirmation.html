@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #1976d2, #1565c0);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+        }
+        .content {
+            background: #ffffff;
+            padding: 30px 20px;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+        }
+        .booking-details {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #dee2e6;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .label {
+            font-weight: 600;
+            color: #555;
+        }
+        .value {
+            color: #1976d2;
+            font-weight: 500;
+        }
+        .total {
+            font-size: 18px;
+            color: #1976d2;
+            font-weight: 600;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #1976d2;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 500;
+            margin: 20px 0;
+        }
+        .button:hover {
+            background: #1565c0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        .social-links {
+            margin: 20px 0;
+        }
+        .social-links a {
+            display: inline-block;
+            margin: 0 10px;
+            color: #1976d2;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SawariSewa</h1>
+            <p>Booking Confirmed!</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello {{ customer_name }}!</h2>
+            <p>Great news! Your vehicle booking has been confirmed. Here are the details:</p>
+            
+            <div class="booking-details">
+                <div class="detail-row">
+                    <span class="label">Booking ID:</span>
+                    <span class="value">#{{ booking_id }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Vehicle:</span>
+                    <span class="value">{{ vehicle }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Pickup Date:</span>
+                    <span class="value">{{ start_date }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Return Date:</span>
+                    <span class="value">{{ end_date }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Duration:</span>
+                    <span class="value">{{ total_days }} days</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Pickup Location:</span>
+                    <span class="value">{{ pickup_location }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Drop Location:</span>
+                    <span class="value">{{ drop_location }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Total Amount:</span>
+                    <span class="value total">रू {{ total_amount|floatformat:2 }}</span>
+                </div>
+            </div>
+            
+            <h3>Owner Contact Information</h3>
+            <div class="booking-details">
+                <div class="detail-row">
+                    <span class="label">Owner Name:</span>
+                    <span class="value">{{ owner_name }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Contact Number:</span>
+                    <span class="value">{{ owner_phone }}</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{ site_url }}/customer/my-bookings" class="button">
+                    View My Bookings
+                </a>
+            </div>
+            
+            <div style="background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px; padding: 15px; margin-top: 20px;">
+                <p style="margin: 0; color: #856404;">
+                    <strong>Important:</strong> Please carry your driver's license and the security deposit amount (रू {{ security_deposit }}) at the time of pickup.
+                </p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Thank you for choosing SawariSewa!</p>
+            <p>Need help? Contact us at support@sawarisewa.com</p>
+            
+            <div class="social-links">
+                <a href="#">Facebook</a> |
+                <a href="#">Twitter</a> |
+                <a href="#">Instagram</a>
+            </div>
+            
+            <p style="font-size: 12px; color: #999;">
+                © {{ year }} SawariSewa. All rights reserved.<br>
+                This is an automated message, please do not reply to this email.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

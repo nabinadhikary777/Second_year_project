@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Payment Confirmation</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #28a745; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-top: none; }
+        .payment-details { background: white; padding: 20px; border-radius: 5px; margin: 15px 0; }
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .label { font-weight: bold; color: #555; }
+        .value { color: #28a745; font-size: 18px; font-weight: bold; }
+        .button { display: inline-block; padding: 10px 20px; background: #1976d2; color: white; text-decoration: none; border-radius: 5px; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Payment Successful!</h2>
+        </div>
+        
+        <div class="content">
+            <h3>Thank you for your payment, {{ customer_name }}!</h3>
+            
+            <div class="payment-details">
+                <div class="detail-row">
+                    <span class="label">Transaction ID:</span>
+                    <span class="value">{{ payment_id }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Amount Paid:</span>
+                    <span class="value">रू {{ amount|floatformat:2 }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Payment Method:</span>
+                    <span>{{ payment_method|title }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Date & Time:</span>
+                    <span>{{ payment_date }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Booking ID:</span>
+                    <span>#{{ booking_id }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Vehicle:</span>
+                    <span>{{ vehicle }}</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{ site_url }}/customer/my-bookings" class="button">
+                    View Booking
+                </a>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">
+                A receipt has been sent to your email. Please keep this for your records.
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>© {{ year }} SawariSewa. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

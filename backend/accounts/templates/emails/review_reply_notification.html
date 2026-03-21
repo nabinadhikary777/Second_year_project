@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Owner Replied to Your Review</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #1976d2; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-top: none; }
+        .reply-box { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2> Owner Replied to Your Review</h2>
+        </div>
+        <div class="content">
+            <p>Hello {{ customer_name }},</p>
+            <p><strong>{{ owner_name }}</strong> has replied to your review for <strong>{{ vehicle }}</strong> ({{ rating }} stars).</p>
+            <p><strong>Your review:</strong> {{ your_review }}</p>
+            <div class="reply-box">
+                <p><strong>Owner's reply:</strong></p>
+                <p>{{ owner_reply }}</p>
+            </div>
+            <p style="text-align: center;">
+                <a href="{{ site_url }}/customer/vehicles" style="display: inline-block; padding: 10px 20px; background: #1976d2; color: white; text-decoration: none; border-radius: 5px;">Browse Vehicles</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>© {{ year }} SawariSewa. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
