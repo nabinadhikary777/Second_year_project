@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Q, Sum, Avg, Count
 from django.utils import timezone
 from django.contrib.auth.tokens import default_token_generator
@@ -11,13 +12,13 @@ from django.utils.encoding import force_bytes, force_str
 from datetime import datetime, timedelta
 from .models import (
     Vehicle, Booking, Review, Payment, VehicleCategory, 
-    UserProfile, OwnerEarning
+    UserProfile, OwnerEarning, Notification
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, VehicleSerializer,
     VehicleCreateUpdateSerializer, BookingSerializer,
     BookingCreateSerializer, ReviewSerializer, PaymentSerializer,
-    VehicleCategorySerializer, OwnerEarningSerializer
+    VehicleCategorySerializer, OwnerEarningSerializer, NotificationSerializer
 )
 from .utils.email import (
     send_booking_confirmation_email,
@@ -31,9 +32,18 @@ from .utils.email import (
 import uuid
 import json
 from decimal import Decimal
+from django.conf import settings
 
 # Khalti Payment Integration
 import requests
+from rest_framework.pagination import PageNumberPagination
+
+
+class VehicleListPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 
 # ============== AUTHENTICATION VIEWS ==============
 @api_view(['GET'])
@@ -140,6 +150,7 @@ class VehicleCategoryListView(generics.ListAPIView):
 class VehicleListView(generics.ListAPIView):
     serializer_class = VehicleSerializer
     permission_classes = [AllowAny]
+    pagination_class = VehicleListPagination
     
     def get_queryset(self):
         queryset = Vehicle.objects.filter(status='available')
@@ -180,11 +191,17 @@ class VehicleListView(generics.ListAPIView):
         # Search by brand/model
         search = self.request.query_params.get('search')
         if search:
-            queryset = queryset.filter(
-                Q(brand__icontains=search) | 
-                Q(model__icontains=search) |
-                Q(description__icontains=search)
-            )
+            # Apply tokenized search so full names like "KTM Duke"
+            # can match across brand/model/description/city/category.
+            search_terms = [term for term in search.split() if term.strip()]
+            for term in search_terms:
+                queryset = queryset.filter(
+                    Q(brand__icontains=term) |
+                    Q(model__icontains=term) |
+                    Q(description__icontains=term) |
+                    Q(city__icontains=term) |
+                    Q(category__name__icontains=term)
+                )
         
         # Sort by
         sort_by = self.request.query_params.get('sort_by')
@@ -196,6 +213,9 @@ class VehicleListView(generics.ListAPIView):
             queryset = queryset.order_by('-average_rating')
         elif sort_by == 'newest':
             queryset = queryset.order_by('-year')
+        else:
+            # Default: show newest vehicles first
+            queryset = queryset.order_by('-created_at')
         
         return queryset
 
@@ -226,6 +246,12 @@ class OwnerVehicleUpdateView(generics.RetrieveUpdateAPIView):
     
     def get_queryset(self):
         return Vehicle.objects.filter(owner=self.request.user)
+    
+    def get_serializer(self, *args, **kwargs):
+        # Allow partial updates so we can update without resending all images
+        if args and self.request.method in ('PUT', 'PATCH'):
+            kwargs['partial'] = True
+        return super().get_serializer(*args, **kwargs)
 
 class OwnerVehicleDeleteView(generics.DestroyAPIView):
     permission_classes = [IsAuthenticated]
@@ -343,14 +369,16 @@ class UpdateBookingStatusView(generics.UpdateAPIView):
             booking.vehicle.status = 'available'
             booking.payment_status = 'completed'
             
-            # Create owner earning
+            # Create/update owner earning (idempotent for repeated status updates)
             commission = booking.total_amount * Decimal('0.10')  # 10% commission
-            OwnerEarning.objects.create(
+            OwnerEarning.objects.update_or_create(
                 owner=booking.vehicle.owner,
                 booking=booking,
-                amount=booking.total_amount,
-                commission=commission,
-                net_amount=booking.total_amount - commission
+                defaults={
+                    'amount': booking.total_amount,
+                    'commission': commission,
+                    'net_amount': booking.total_amount - commission,
+                }
             )
         elif new_status in ['cancelled', 'rejected']:
             booking.vehicle.status = 'available'
@@ -370,6 +398,41 @@ class UpdateBookingStatusView(generics.UpdateAPIView):
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
 
+
+class CustomerCancelBookingView(generics.UpdateAPIView):
+    """Allows customers to cancel their own pending or confirmed bookings."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = BookingSerializer
+
+    def get_queryset(self):
+        return Booking.objects.filter(customer=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        booking = self.get_object()
+        old_status = booking.booking_status
+        reason = request.data.get('reason', 'Cancelled by customer')
+
+        # Customers can only cancel pending or confirmed bookings
+        if old_status not in ['pending', 'confirmed']:
+            return Response(
+                {'error': f'Cannot cancel booking with status: {old_status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        booking.booking_status = 'cancelled'
+        booking.cancellation_reason = reason
+        booking.vehicle.status = 'available'
+        booking.save()
+        booking.vehicle.save()
+
+        try:
+            send_booking_status_update_email(booking, old_status, 'cancelled')
+        except Exception:
+            pass
+
+        serializer = self.get_serializer(booking)
+        return Response(serializer.data)
+
 # ============== REVIEW VIEWS ==============
 class CreateReviewView(generics.CreateAPIView):
     serializer_class = ReviewSerializer
@@ -382,8 +445,10 @@ class CreateReviewView(generics.CreateAPIView):
         if booking.customer != self.request.user:
             raise serializers.ValidationError("You can only review your own bookings")
         
-        if booking.booking_status != 'completed':
-            raise serializers.ValidationError("You can only review completed bookings")
+        if booking.booking_status not in ['confirmed', 'ongoing', 'completed']:
+            raise serializers.ValidationError(
+                "You can review only after booking is confirmed by owner"
+            )
         
         # Check if review already exists
         if Review.objects.filter(booking=booking).exists():
@@ -394,6 +459,21 @@ class CreateReviewView(generics.CreateAPIView):
             vehicle=booking.vehicle,
             booking=booking
         )
+
+        # Notify vehicle owner about new customer review.
+        # Keep review creation resilient even if notification table/migration is missing.
+        try:
+            Notification.objects.create(
+                recipient=booking.vehicle.owner,
+                actor=self.request.user,
+                booking=booking,
+                review=review,
+                title='New Review Received',
+                message=f'{self.request.user.username} rated your vehicle {review.rating} star(s).',
+                action_url='/owner/reviews',
+            )
+        except Exception:
+            pass
         
         # Update vehicle rating
         booking.vehicle.update_rating()
@@ -419,11 +499,27 @@ class ReplyToReviewView(generics.UpdateAPIView):
     
     def update(self, request, *args, **kwargs):
         review = self.get_object()
-        reply = request.data.get('reply')
+        reply = (request.data.get('reply') or '').strip()
+        if not reply:
+            return Response({'error': 'Reply is required'}, status=400)
         
         review.owner_reply = reply
         review.owner_replied_at = timezone.now()
         review.save()
+
+        # Notify customer when owner replies.
+        try:
+            Notification.objects.create(
+                recipient=review.customer,
+                actor=request.user,
+                booking=review.booking,
+                review=review,
+                title='Owner Replied to Your Review',
+                message=f'{request.user.username} replied to your review.',
+                action_url=f'/customer/booking-detail/{review.booking.id}',
+            )
+        except Exception:
+            pass
         
         try:
             send_review_reply_notification_email(review)
@@ -432,6 +528,49 @@ class ReplyToReviewView(generics.UpdateAPIView):
         
         serializer = ReviewSerializer(review)
         return Response(serializer.data)
+
+
+class OwnerReviewsListView(generics.ListAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Review.objects.filter(vehicle__owner=self.request.user).order_by('-created_at')
+        vehicle_id = self.request.query_params.get('vehicle_id')
+        if vehicle_id:
+            queryset = queryset.filter(vehicle_id=vehicle_id)
+        return queryset
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_notifications(request):
+    queryset = Notification.objects.filter(recipient=request.user).order_by('-created_at')[:30]
+    unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+    serializer = NotificationSerializer(queryset, many=True)
+    return Response({
+        'results': serializer.data,
+        'unread_count': unread_count,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_notification_read(request, notification_id):
+    try:
+        notification = Notification.objects.get(id=notification_id, recipient=request.user)
+    except Notification.DoesNotExist:
+        return Response({'error': 'Notification not found'}, status=404)
+    notification.is_read = True
+    notification.save(update_fields=['is_read'])
+    return Response({'success': True})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_all_notifications_read(request):
+    Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    return Response({'success': True})
 
 # ============== PAYMENT VIEWS ==============
 @api_view(['POST'])
@@ -444,31 +583,47 @@ def initiate_khalti_payment(request):
     except Booking.DoesNotExist:
         return Response({'error': 'Booking not found'}, status=404)
     
-    # Khalti API endpoint
-    url = "https://dev.khalti.com/api/v2/epayment/initiate/"
+    base = getattr(settings, 'KHALTI_API_URL', 'https://dev.khalti.com/api/v2').rstrip('/')
+    url = f"{base}/epayment/initiate/"
     
+    # Use configured frontend/site URL so it matches Khalti merchant settings.
+    site_url = getattr(settings, 'SITE_URL', 'http://localhost:3000').rstrip('/')
+    return_url = f"{site_url}/customer/payment/{booking.id}"
+
+    # Khalti ePayment requires amount in paisa and minimum Rs 10.
+    amount_paisa = int(booking.total_amount * 100)
+    if amount_paisa < 1000:
+        return Response(
+            {'error': 'Minimum Khalti payment is Rs 10 (1000 paisa).'},
+            status=400
+        )
+
     # Prepare payment data
     payload = {
-        "return_url": "http://localhost:3000/payment/success",
-        "website_url": "http://localhost:3000",
-        "amount": int(booking.total_amount * 100),  # In paisa
+        "return_url": return_url,
+        "website_url": site_url,
+        "amount": amount_paisa,  # In paisa
         "purchase_order_id": f"BOOKING_{booking.id}",
         "purchase_order_name": f"Vehicle Rental - {booking.vehicle.brand} {booking.vehicle.model}",
         "customer_info": {
             "name": request.user.username,
-            "email": request.user.email,
-            "phone": request.user.profile.phone_number
+            "email": request.user.email or "test@example.com",
+            "phone": getattr(request.user.profile, 'phone_number', None) or "9800000000"
         }
     }
     
     headers = {
-        'Authorization': 'key your_khalti_secret_key',
+        'Authorization': f'Key {getattr(settings, "KHALTI_SECRET_KEY", "")}',
         'Content-Type': 'application/json',
     }
     
     try:
         response = requests.post(url, json=payload, headers=headers)
-        return Response(response.json())
+        data = response.json()
+        if response.status_code >= 400:
+            err_msg = data.get('detail') or data.get('error') or str(data)
+            return Response({'error': err_msg, 'raw': data}, status=response.status_code)
+        return Response(data)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
@@ -479,13 +634,14 @@ def verify_khalti_payment(request):
     booking_id = request.data.get('booking_id')
     total_amount = request.data.get('total_amount')
     
-    url = "https://dev.khalti.com/api/v2/epayment/lookup/"
+    base = getattr(settings, 'KHALTI_API_URL', 'https://dev.khalti.com/api/v2').rstrip('/')
+    url = f"{base}/epayment/lookup/"
     payload = {
         "pidx": pidx
     }
     
     headers = {
-        'Authorization': 'key your_khalti_secret_key',
+        'Authorization': f'Key {getattr(settings, "KHALTI_SECRET_KEY", "")}',
         'Content-Type': 'application/json',
     }
     
@@ -494,33 +650,64 @@ def verify_khalti_payment(request):
         data = response.json()
         
         if data.get('status') == 'Completed':
-            booking = Booking.objects.get(id=booking_id)
-            
-            # Create payment record
-            payment = Payment.objects.create(
-                booking=booking,
-                customer=request.user,
-                owner=booking.vehicle.owner,
-                amount=total_amount,
-                payment_method='khalti',
-                transaction_id=data.get('transaction_id'),
-                khalti_token=pidx
-            )
-            
-            # Update booking payment status
-            booking.paid_amount += Decimal(str(total_amount))
-            if booking.paid_amount >= booking.total_amount:
-                booking.payment_status = 'completed'
-                booking.security_deposit_paid = True
-            else:
-                booking.payment_status = 'partial'
-            booking.save()
-            
             try:
-                send_payment_confirmation_email(payment)
-            except Exception:
-                pass
-            
+                booking = Booking.objects.get(id=booking_id, customer=request.user)
+            except Booking.DoesNotExist:
+                return Response({'error': 'Booking not found'}, status=404)
+
+            # Prefer trusted Khalti amount (paisa) instead of client-provided value.
+            khalti_total_paisa = data.get('total_amount')
+            if khalti_total_paisa is not None:
+                amount_rupees = (Decimal(str(khalti_total_paisa)) / Decimal('100')).quantize(Decimal('0.01'))
+            else:
+                amount_rupees = Decimal(str(total_amount or 0))
+
+            transaction_id = data.get('transaction_id') or pidx
+            if not transaction_id:
+                return Response({'error': 'Missing transaction id from Khalti response'}, status=400)
+
+            with transaction.atomic():
+                payment, created = Payment.objects.get_or_create(
+                    transaction_id=transaction_id,
+                    defaults={
+                        'booking': booking,
+                        'customer': request.user,
+                        'owner': booking.vehicle.owner,
+                        'amount': amount_rupees,
+                        'payment_method': 'khalti',
+                        'khalti_token': pidx or '',
+                    }
+                )
+
+                # Idempotent verification: if already saved, return success without mutating totals again.
+                if created:
+                    booking.paid_amount += Decimal(str(payment.amount))
+                    if booking.paid_amount >= booking.total_amount:
+                        booking.payment_status = 'completed'
+                        booking.security_deposit_paid = True
+                    else:
+                        booking.payment_status = 'partial'
+                    booking.save()
+
+                    # Reflect owner earnings as soon as payment succeeds.
+                    # Keep one earning row per booking and update it as paid amount changes.
+                    earning_amount = booking.paid_amount
+                    commission = earning_amount * Decimal('0.10')
+                    OwnerEarning.objects.update_or_create(
+                        owner=booking.vehicle.owner,
+                        booking=booking,
+                        defaults={
+                            'amount': earning_amount,
+                            'commission': commission,
+                            'net_amount': earning_amount - commission,
+                        }
+                    )
+
+                    try:
+                        send_payment_confirmation_email(payment)
+                    except Exception:
+                        pass
+
             serializer = PaymentSerializer(payment)
             return Response(serializer.data)
         
@@ -528,6 +715,89 @@ def verify_khalti_payment(request):
         
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def initiate_khalti_test_payment(request):
+    """
+    Initiate a Khalti test transaction (Rs 10 minimum). No booking required.
+    Returns payment_url for redirect. Use ePayment flow.
+    """
+    from django.conf import settings as django_settings
+    site_url = getattr(django_settings, 'SITE_URL', 'http://localhost:3000').rstrip('/')
+    return_url = f"{site_url}/customer/khalti-test"
+
+    base = getattr(django_settings, 'KHALTI_API_URL', 'https://dev.khalti.com/api/v2').rstrip('/')
+    url = f"{base}/epayment/initiate/"
+    payload = {
+        "return_url": return_url,
+        "website_url": site_url,
+        "amount": 1000,  # Rs 10 minimum (Khalti requirement)
+        "purchase_order_id": f"TEST_{request.user.id}_{uuid.uuid4().hex[:8]}",
+        "purchase_order_name": "SawariSewa - Khalti Test Payment",
+        "customer_info": {
+            "name": request.user.username,
+            "email": request.user.email or "test@example.com",
+            "phone": getattr(request.user.profile, 'phone_number', None) or "9800000000",
+        }
+    }
+
+    secret_key = getattr(settings, 'KHALTI_SECRET_KEY', '')
+    headers = {
+        'Authorization': f'Key {secret_key}',
+        'Content-Type': 'application/json',
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        data = response.json()
+        if 'payment_url' in data:
+            return Response(data)
+        # Use 400 (not 401) for Khalti API errors - frontend treats 401 as "redirect to login"
+        err_msg = data.get('detail') or data.get('error') or str(data)
+        if 'invalid token' in str(err_msg).lower():
+            err_msg = (
+                f"{err_msg} Get your Live secret key from https://test-admin.khalti.com/ "
+                "(sign up as merchant, then Developer → Keys)."
+            )
+        return Response({'error': err_msg, 'raw': data}, status=400)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_khalti_test_payment(request):
+    """
+    Verify a Khalti test transaction (no DB save).
+    Use this to test the payment flow with minimal amount (e.g., Rs 1).
+    """
+    pidx = request.data.get('pidx')
+    if not pidx:
+        return Response({'error': 'pidx is required'}, status=400)
+
+    base = getattr(settings, 'KHALTI_API_URL', 'https://dev.khalti.com/api/v2').rstrip('/')
+    url = f"{base}/epayment/lookup/"
+    payload = {"pidx": pidx}
+    headers = {
+        'Authorization': f'Key {getattr(settings, "KHALTI_SECRET_KEY", "")}',
+        'Content-Type': 'application/json',
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        data = response.json()
+        return Response({
+            'success': data.get('status') == 'Completed',
+            'status': data.get('status'),
+            'transaction_id': data.get('transaction_id'),
+            'amount': data.get('total_amount'),
+            'raw_response': data,
+        })
+    except Exception as e:
+        return Response({'error': str(e), 'success': False}, status=500)
+
 
 class PaymentHistoryView(generics.ListAPIView):
     serializer_class = PaymentSerializer

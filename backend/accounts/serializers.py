@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     UserProfile, Vehicle, VehicleCategory, Booking, 
-    Review, Payment, OwnerEarning
+    Review, Payment, OwnerEarning, Notification
 )
 from dj_rest_auth.serializers import UserDetailsSerializer
 
@@ -69,10 +69,34 @@ class VehicleSerializer(serializers.ModelSerializer):
     owner_phone = serializers.ReadOnlyField(source='owner.profile.phone_number')
     owner_city = serializers.ReadOnlyField(source='owner.profile.city')
     category_name = serializers.ReadOnlyField(source='category.name')
+    main_image = serializers.SerializerMethodField()
+    image1 = serializers.SerializerMethodField()
+    image2 = serializers.SerializerMethodField()
+    image3 = serializers.SerializerMethodField()
     
     class Meta:
         model = Vehicle
         fields = '__all__'
+    
+    def _get_image_url(self, image_field):
+        if not image_field:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(image_field.url)
+        return image_field.url
+    
+    def get_main_image(self, obj):
+        return self._get_image_url(obj.main_image)
+    
+    def get_image1(self, obj):
+        return self._get_image_url(obj.image1)
+    
+    def get_image2(self, obj):
+        return self._get_image_url(obj.image2)
+    
+    def get_image3(self, obj):
+        return self._get_image_url(obj.image3)
 
 class VehicleCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -115,20 +139,48 @@ class BookingSerializer(serializers.ModelSerializer):
     customer_name = serializers.ReadOnlyField(source='customer.username')
     customer_phone = serializers.ReadOnlyField(source='customer.profile.phone_number')
     vehicle_details = serializers.SerializerMethodField()
+    has_review = serializers.SerializerMethodField()
+    review_rating = serializers.SerializerMethodField()
+    review_comment = serializers.SerializerMethodField()
+    owner_reply = serializers.SerializerMethodField()
+    owner_replied_at = serializers.SerializerMethodField()
     
     class Meta:
         model = Booking
         fields = '__all__'
     
     def get_vehicle_details(self, obj):
+        request = self.context.get('request')
+        image_url = obj.vehicle.main_image.url if obj.vehicle.main_image else None
+        if request and image_url:
+            image_url = request.build_absolute_uri(image_url)
         return {
             'id': obj.vehicle.id,
             'brand': obj.vehicle.brand,
             'model': obj.vehicle.model,
-            'image': obj.vehicle.main_image.url if obj.vehicle.main_image else None,
+            'image': image_url,
             'owner': obj.vehicle.owner.username,
             'owner_phone': obj.vehicle.owner.profile.phone_number
         }
+
+    def get_has_review(self, obj):
+        return hasattr(obj, 'review')
+
+    def get_review_rating(self, obj):
+        review = getattr(obj, 'review', None)
+        return review.rating if review else None
+
+    def get_review_comment(self, obj):
+        review = getattr(obj, 'review', None)
+        return review.comment if review else ''
+
+    def get_owner_reply(self, obj):
+        review = getattr(obj, 'review', None)
+        return review.owner_reply if review else ''
+
+    def get_owner_replied_at(self, obj):
+        review = getattr(obj, 'review', None)
+        return review.owner_replied_at if review else None
 
 class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -164,12 +216,23 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 
 class ReviewSerializer(serializers.ModelSerializer):
     customer_name = serializers.ReadOnlyField(source='customer.username')
-    customer_profile_pic = serializers.ReadOnlyField(source='customer.profile.profile_picture.url')
+    customer_profile_pic = serializers.SerializerMethodField()
+    vehicle_name = serializers.SerializerMethodField()
     
     class Meta:
         model = Review
         fields = '__all__'
         read_only_fields = ['customer', 'vehicle', 'booking', 'owner_reply', 'owner_replied_at']
+
+    def get_customer_profile_pic(self, obj):
+        profile = getattr(obj.customer, 'profile', None)
+        picture = getattr(profile, 'profile_picture', None)
+        if picture:
+            return picture.url
+        return None
+
+    def get_vehicle_name(self, obj):
+        return f"{obj.vehicle.brand} {obj.vehicle.model}"
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -194,3 +257,14 @@ class OwnerEarningSerializer(serializers.ModelSerializer):
             'start_date': obj.booking.start_date,
             'end_date': obj.booking.end_date
         }
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = '__all__'
+
+    def get_actor_name(self, obj):
+        return obj.actor.username if obj.actor else None

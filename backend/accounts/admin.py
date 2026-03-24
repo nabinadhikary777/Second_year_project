@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     UserProfile, VehicleCategory, Vehicle, 
-    Booking, Review, Payment, OwnerEarning
+    Booking, Review, Payment, OwnerEarning, Notification
 )
 
 @admin.register(UserProfile)
@@ -46,3 +46,10 @@ class OwnerEarningAdmin(admin.ModelAdmin):
     list_display = ['owner', 'booking', 'amount', 'commission', 'net_amount', 'is_paid']
     list_filter = ['is_paid']
     search_fields = ['owner__username']
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['recipient', 'title', 'is_read', 'created_at']
+    list_filter = ['is_read', 'created_at']
+    search_fields = ['recipient__username', 'title', 'message']

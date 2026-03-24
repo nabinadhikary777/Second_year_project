@@ -1,0 +1,6 @@
+# Local secrets & env
+.env
+backend/.env
+frontend/.env
+*.pyc
+__pycache__/

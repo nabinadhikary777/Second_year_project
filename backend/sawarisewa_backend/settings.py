@@ -3,6 +3,30 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _load_env_file():
+    """Load KEY=value pairs from backend/.env into os.environ (no extra dependencies)."""
+    env_path = BASE_DIR / '.env'
+    if not env_path.is_file():
+        return
+    try:
+        for line in env_path.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' in line:
+                key, val = line.split('=', 1)
+                key = key.strip()
+                if not key or key in os.environ:
+                    continue
+                val = val.strip().strip('"').strip("'")
+                os.environ[key] = val
+    except OSError:
+        pass
+
+
+_load_env_file()
+
 SECRET_KEY = 'django-insecure-your-secret-key-here'
 
 DEBUG = True
@@ -144,7 +168,9 @@ EMAIL_HOST_PASSWORD = 'your-app-password'  # Use Gmail App Password
 DEFAULT_FROM_EMAIL = 'SawariSewa <noreply@sawarisewa.com>'
 
 
-# Khalti Payment Settings
-KHALTI_PUBLIC_KEY = 'your_khalti_public_key'
-KHALTI_SECRET_KEY = 'your_khalti_secret_key'
-SITE_URL = 'http://localhost:3000'
+# Khalti Payment (set KHALTI_* in backend/.env — never commit real keys to git)
+KHALTI_PUBLIC_KEY = os.environ.get('KHALTI_PUBLIC_KEY', '')
+KHALTI_SECRET_KEY = os.environ.get('KHALTI_SECRET_KEY', '')
+# Base API URL, e.g. https://dev.khalti.com/api/v2
+KHALTI_API_URL = os.environ.get('KHALTI_API_URL', 'https://dev.khalti.com/api/v2').rstrip('/')
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:3000')

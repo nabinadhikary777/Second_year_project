@@ -175,7 +175,7 @@ class Review(models.Model):
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='reviews')
     
     rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)])
-    comment = models.TextField()
+    comment = models.TextField(blank=True)
     
     owner_reply = models.TextField(blank=True)
     owner_replied_at = models.DateTimeField(null=True, blank=True)
@@ -228,3 +228,24 @@ class OwnerEarning(models.Model):
     
     def __str__(self):
         return f"Earning - {self.owner.username} - Rs.{self.net_amount}"
+
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    actor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_notifications'
+    )
+    booking = models.ForeignKey('Booking', on_delete=models.CASCADE, null=True, blank=True)
+    review = models.ForeignKey('Review', on_delete=models.CASCADE, null=True, blank=True)
+
+    title = models.CharField(max_length=120)
+    message = models.TextField()
+    action_url = models.CharField(max_length=255, blank=True, default='')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.recipient.username}: {self.title}"
