@@ -1,0 +1,7 @@
+# Local secrets & env
+.env
+backend/.env
+frontend/.env
+*.pyc
+__pycache__/
+/node_modules
