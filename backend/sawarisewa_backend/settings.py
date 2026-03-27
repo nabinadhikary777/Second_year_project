@@ -158,14 +158,22 @@ ACCOUNT_EMAIL_VERIFICATION = 'none'
 ACCOUNT_AUTHENTICATION_METHOD = 'username'
 ACCOUNT_USERNAME_REQUIRED = True
 
-# Email Settings (for development)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-email@gmail.com'  # Replace with your email
-EMAIL_HOST_PASSWORD = 'your-app-password'  # Use Gmail App Password
-DEFAULT_FROM_EMAIL = 'SawariSewa <noreply@sawarisewa.com>'
+# Email Settings
+# Configure via backend/.env to send real emails.
+_email_user = os.environ.get('EMAIL_HOST_USER', '')
+_email_password = os.environ.get('EMAIL_HOST_PASSWORD', '')
+_default_email_backend = (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if _email_user and _email_password
+    else 'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', _default_email_backend)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
+EMAIL_HOST_USER = _email_user
+EMAIL_HOST_PASSWORD = _email_password
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'SawariSewa <noreply@sawarisewa.com>')
 
 
 # Khalti Payment (set KHALTI_* in backend/.env — never commit real keys to git)
@@ -173,4 +181,5 @@ KHALTI_PUBLIC_KEY = os.environ.get('KHALTI_PUBLIC_KEY', '')
 KHALTI_SECRET_KEY = os.environ.get('KHALTI_SECRET_KEY', '')
 # Base API URL, e.g. https://dev.khalti.com/api/v2
 KHALTI_API_URL = os.environ.get('KHALTI_API_URL', 'https://dev.khalti.com/api/v2').rstrip('/')
-SITE_URL = os.environ.get('SITE_URL', 'http://localhost:3000')
+# Support FRONTEND_URL as primary; keep SITE_URL as backward-compatible fallback.
+SITE_URL = os.environ.get('FRONTEND_URL') or os.environ.get('SITE_URL', 'http://localhost:3000')

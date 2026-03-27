@@ -20,7 +20,7 @@ class EmailThread(threading.Thread):
         msg = EmailMultiAlternatives(
             self.subject, 
             text_content, 
-            settings.EMAIL_HOST_USER, 
+            settings.DEFAULT_FROM_EMAIL,
             self.recipient_list
         )
         msg.attach_alternative(self.html_content, "text/html")
@@ -211,14 +211,15 @@ def send_welcome_email(user):
 def send_password_reset_email(user, token):
     """Send password reset email"""
     uid = urlsafe_base64_encode(force_bytes(user.pk))
-    reset_link = f"http://localhost:3000/reset-password?token={token}&uid={uid}"
+    site_url = getattr(settings, 'SITE_URL', 'http://localhost:3000').rstrip('/')
+    reset_link = f"{site_url}/reset-password?token={token}&uid={uid}"
     
     context = {
         'username': user.username,
         'reset_link': reset_link,
         'expiry_hours': 24,
         'year': timezone.now().year,
-        'site_url': 'http://localhost:3000',
+        'site_url': site_url,
     }
     
     send_html_email(

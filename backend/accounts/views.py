@@ -106,19 +106,30 @@ class RegisterView(generics.CreateAPIView):
 @permission_classes([AllowAny])
 def request_password_reset(request):
     email = request.data.get('email')
-    
+
+    # Always return a generic success response to avoid leaking which emails exist.
+    generic_response = {
+        'message': 'If an account exists for this email, a password reset link has been sent.'
+    }
+
     try:
-        user = User.objects.get(email=email)
+        if not email:
+            return Response(generic_response)
+
+        user = User.objects.filter(email=email).first()
+        if not user:
+            return Response(generic_response)
+
         token = default_token_generator.make_token(user)
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        
+
         try:
             send_password_reset_email(user, token)
         except Exception:
-            pass  # Don't fail if email fails (e.g. console backend)
-        return Response({'message': 'Password reset email sent successfully'})
-    except User.DoesNotExist:
-        return Response({'error': 'User with this email does not exist'}, status=400)
+            pass  # Don't fail password reset request if email send fails
+
+        return Response(generic_response)
+    except Exception:
+        return Response(generic_response)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -301,6 +312,19 @@ class CreateBookingView(generics.CreateAPIView):
         except Exception:
             pass
 
+        # Notify owner about a new booking request.
+        try:
+            Notification.objects.create(
+                recipient=vehicle.owner,
+                actor=self.request.user,
+                booking=booking,
+                title='New Booking Request',
+                message=f'{self.request.user.username} requested to book your {vehicle.brand} {vehicle.model}.',
+                action_url='/owner/bookings',
+            )
+        except Exception:
+            pass
+
 class CustomerBookingListView(generics.ListAPIView):
     serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
@@ -394,6 +418,27 @@ class UpdateBookingStatusView(generics.UpdateAPIView):
             send_booking_status_update_email(booking, old_status, new_status)
         except Exception:
             pass
+
+        # Notify customer when owner updates booking status (confirm/cancel/etc.).
+        try:
+            status_titles = {
+                'confirmed': 'Booking Confirmed',
+                'cancelled': 'Booking Cancelled',
+                'rejected': 'Booking Rejected',
+                'ongoing': 'Trip Started',
+                'completed': 'Trip Completed',
+            }
+            title = status_titles.get(new_status, 'Booking Status Updated')
+            Notification.objects.create(
+                recipient=booking.customer,
+                actor=request.user,
+                booking=booking,
+                title=title,
+                message=f'Your booking #{booking.id} is now {new_status}.',
+                action_url='/customer/my-bookings',
+            )
+        except Exception:
+            pass
         
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
@@ -427,6 +472,19 @@ class CustomerCancelBookingView(generics.UpdateAPIView):
 
         try:
             send_booking_status_update_email(booking, old_status, 'cancelled')
+        except Exception:
+            pass
+
+        # Notify owner when customer cancels the booking.
+        try:
+            Notification.objects.create(
+                recipient=booking.vehicle.owner,
+                actor=request.user,
+                booking=booking,
+                title='Booking Cancelled',
+                message=f'{request.user.username} cancelled booking #{booking.id}.',
+                action_url='/owner/bookings',
+            )
         except Exception:
             pass
 
@@ -705,6 +763,19 @@ def verify_khalti_payment(request):
 
                     try:
                         send_payment_confirmation_email(payment)
+                    except Exception:
+                        pass
+
+                    # Notify owner when customer payment is successful.
+                    try:
+                        Notification.objects.create(
+                            recipient=booking.vehicle.owner,
+                            actor=request.user,
+                            booking=booking,
+                            title='Payment Received',
+                            message=f'{request.user.username} completed payment for booking #{booking.id}.',
+                            action_url='/owner/bookings',
+                        )
                     except Exception:
                         pass
 
